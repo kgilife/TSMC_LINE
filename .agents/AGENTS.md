@@ -12,3 +12,9 @@
   3. Creates a new immutable version via `POST https://script.googleapis.com/v1/projects/{scriptId}/versions`.
   4. Updates all active Web App deployments to the newly created version number via `PUT https://script.googleapis.com/v1/projects/{scriptId}/deployments/{deploymentId}` with `manifestFileName: "appsscript"`.
   5. Verifies live deployment.
+
+## Repository & Target Deployment Binding
+- **Project Repository**: Bound to `https://github.com/kgilife/TSMC_LINE.git` (`origin`).
+- **GitHub Pages**: Bound to `https://kgilife.github.io/TSMC_LINE/`.
+- **Default Git Push Target**: All `git push` commands in this project MUST push to `origin` (`kgilife/TSMC_LINE`).
+
