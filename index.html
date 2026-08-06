@@ -80,28 +80,61 @@
         window.location.replace(url || defaultTarget);
       }
 
-      // 超時 1.5 秒降級保護機制
+      // 超時 3 秒降級保護（給 GAS 冷啟動 + IP API 足夠時間）
       const fallbackTimer = setTimeout(function() {
         redirect(defaultTarget);
-      }, 1500);
+      }, 3000);
 
-      // 參考 JX3_Guatian 穩定的 IP + 地理位置抓取機制
+      // IP + 地理位置抓取（主 API + 備援 API）
       function getIP() {
-        return fetch('https://api.db-ip.com/v2/free/self')
-          .then(function(r) { return r.json(); })
-          .then(function(d) {
-            if (d && d.ipAddress) {
-              const loc = (d.countryName || d.city) ? ' (' + (d.countryName || '') + (d.city ? ', ' + d.city : '') + ')' : '';
-              return d.ipAddress + loc;
-            }
-            return '';
-          })
-          .catch(function() {
-            return fetch('https://api.ipify.org?format=json')
+        // 設定 IP API 自身的 timeout：最多 1500ms
+        function withTimeout(promise, ms) {
+          return Promise.race([
+            promise,
+            new Promise(function(_, reject) { setTimeout(function() { reject(new Error('timeout')); }, ms); })
+          ]);
+        }
+        return withTimeout(
+          fetch('https://api.db-ip.com/v2/free/self')
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+              if (d && d.ipAddress) {
+                const loc = (d.countryName || d.city) ? ' (' + (d.countryName || '') + (d.city ? ', ' + d.city : '') + ')' : '';
+                return d.ipAddress + loc;
+              }
+              return '';
+            }),
+          1500
+        ).catch(function() {
+          // 備援：ipify
+          return withTimeout(
+            fetch('https://api.ipify.org?format=json')
               .then(function(r) { return r.json(); })
-              .then(function(d) { return d.ip || ''; })
-              .catch(function() { return ''; });
-          });
+              .then(function(d) { return d.ip || ''; }),
+            1000
+          ).catch(function() { return ''; });
+        });
+      }
+
+      // sendBeacon 保底記錄（跳轉後仍可送出）
+      function beaconLog(clientIp, targetUrl) {
+        if (!gasUrl || !code) return;
+        try {
+          const logUrl = gasUrl + (gasUrl.includes('?') ? '&' : '?') +
+            'action=log' +
+            '&code=' + encodeURIComponent(code) +
+            '&urlId=' +
+            '&fp=' + encodeURIComponent(getFP()) +
+            '&ip=' + encodeURIComponent(clientIp || '') +
+            '&referer=' + encodeURIComponent(document.referrer || '') +
+            '&userAgent=' + encodeURIComponent(navigator.userAgent || '');
+          if (navigator.sendBeacon) {
+            navigator.sendBeacon(logUrl);
+          } else {
+            var img = new Image();
+            img.src = logUrl;
+          }
+        } catch (e) {}
       }
 
       if (code && gasUrl) {
@@ -112,9 +145,9 @@
             'action=get_target' +
             '&code=' + encodeURIComponent(code) +
             '&fp=' + encodeURIComponent(fp) +
-            '&ip=' + encodeURIComponent(clientIp) +
-            '&referer=' + encodeURIComponent(document.referrer || "") +
-            '&userAgent=' + encodeURIComponent(navigator.userAgent || "");
+            '&ip=' + encodeURIComponent(clientIp || '') +
+            '&referer=' + encodeURIComponent(document.referrer || '') +
+            '&userAgent=' + encodeURIComponent(navigator.userAgent || '');
 
           fetch(apiEndpoint)
             .then(function(res) { return res.json(); })
@@ -127,6 +160,27 @@
               }
             })
             .catch(function(err) {
+              // GAS API 失敗：用 sendBeacon 保底記錄，然後降級跳轉
+              beaconLog(clientIp, defaultTarget);
+              clearTimeout(fallbackTimer);
+              redirect(defaultTarget);
+            });
+        }).catch(function() {
+          // IP 抓取完全失敗：仍然呼叫 GAS 但帶空 IP
+          const apiEndpoint = gasUrl + (gasUrl.includes('?') ? '&' : '?') +
+            'action=get_target' +
+            '&code=' + encodeURIComponent(code) +
+            '&fp=' + encodeURIComponent(fp) +
+            '&ip=' +
+            '&referer=' + encodeURIComponent(document.referrer || '') +
+            '&userAgent=' + encodeURIComponent(navigator.userAgent || '');
+          fetch(apiEndpoint)
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+              clearTimeout(fallbackTimer);
+              redirect((data && data.targetUrl && data.targetUrl !== '#') ? data.targetUrl : defaultTarget);
+            })
+            .catch(function() {
               clearTimeout(fallbackTimer);
               redirect(defaultTarget);
             });
