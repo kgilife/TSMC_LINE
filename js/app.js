@@ -80,11 +80,11 @@ document.addEventListener('DOMContentLoaded', () => {
     addUrlBtn.disabled = true;
     addUrlBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 新增中...';
     try {
-      const response = await fetch(`${gasUrl}?action=addUrl`, {
-        method: 'POST',
-        body: JSON.stringify({ urlId, targetUrl })
-      });
-      const res = await response.json();
+      const fetchUrl = `${gasUrl}?action=addUrl&urlId=${encodeURIComponent(urlId)}&targetUrl=${encodeURIComponent(targetUrl)}`;
+      const response = await fetch(fetchUrl);
+      const text = await response.text();
+      let res;
+      try { res = JSON.parse(text); } catch(err) { throw new Error('回應格式錯誤'); }
       if (res.success) {
         document.getElementById('new-url-id').value = '';
         document.getElementById('new-target-url').value = '';
@@ -103,11 +103,11 @@ document.addEventListener('DOMContentLoaded', () => {
   window.deleteUrl = async (urlId) => {
     if (!confirm(`確定要刪除網址編號 [${urlId}] 嗎？`)) return;
     try {
-      const response = await fetch(`${gasUrl}?action=deleteUrl`, {
-        method: 'POST',
-        body: JSON.stringify({ urlId })
-      });
-      const res = await response.json();
+      const fetchUrl = `${gasUrl}?action=deleteUrl&urlId=${encodeURIComponent(urlId)}`;
+      const response = await fetch(fetchUrl);
+      const text = await response.text();
+      let res;
+      try { res = JSON.parse(text); } catch(err) { throw new Error('回應格式錯誤'); }
       if (res.success) loadUrls();
       else alert('刪除失敗: ' + res.error);
     } catch (e) {

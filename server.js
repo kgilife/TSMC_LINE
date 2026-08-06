@@ -111,6 +111,8 @@ app.get('/api/stats/export', async (req, res) => {
     console.error('[Server] Error exporting CSV:', err);
     res.status(500).send('Export failed.');
   }
+});
+
 /**
  * API Endpoint: Get click logs for a specific salesperson
  */
