@@ -2,33 +2,117 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- Cache Control to prevent browser cache issues -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>正在跳轉...</title>
+  <title>正在跳轉至推廣頁面...</title>
+  <style>
+    body {
+      background-color: #0b0f19;
+      color: #f3f4f6;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      text-align: center;
+    }
+    .loader {
+      border: 4px solid rgba(255, 255, 255, 0.1);
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border-left-color: #6366f1;
+      animation: spin 1s linear infinite;
+      margin-bottom: 24px;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
   <script>
     document.write('<script src="js/config.js?v=' + new Date().getTime() + '"><\/script>');
   </script>
-  <script>
-    // 品牌短網址中繼跳轉邏輯 (GitHub Pages Redirect)
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('c') || urlParams.get('code');
-
-    if (code && typeof CONFIG !== 'undefined' && CONFIG.GAS_WEB_APP_URL) {
-      // 當帶有推廣代碼時 (?c=10000000)，毫秒級轉發至 GAS 進行點擊記錄與跳轉
-      const gasTarget = CONFIG.GAS_WEB_APP_URL + (CONFIG.GAS_WEB_APP_URL.includes('?') ? '&' : '?') + 'code=' + encodeURIComponent(code);
-      window.location.replace(gasTarget);
-    } else {
-      // 隱蔽安全機制：無代碼造訪者跳轉至預設 LINE OA
-      const targetUrl = (typeof CONFIG !== 'undefined' && CONFIG.TARGET_URL) ? CONFIG.TARGET_URL : '#';
-      window.location.replace(targetUrl);
-    }
-  </script>
 </head>
 <body>
-  <div style="font-family: sans-serif; text-align: center; margin-top: 100px;">
-    <p>正在為您載入推廣頁面...</p>
-  </div>
+  <div class="loader"></div>
+  <h2>正在為您跳轉頁面...</h2>
+  <p style="color: #9ca3af; font-size: 14px;">請稍候，系統將自動開啟推廣頁面</p>
+
+  <script>
+    (function() {
+      const defaultTarget = (typeof CONFIG !== 'undefined' && CONFIG.TARGET_URL) ? CONFIG.TARGET_URL : 'https://r.botbonnie.com/H52rK';
+      const gasUrl = (typeof CONFIG !== 'undefined' && CONFIG.GAS_WEB_APP_URL) ? CONFIG.GAS_WEB_APP_URL : '';
+      
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = (urlParams.get('c') || urlParams.get('code') || '').trim();
+
+      // 簡易前端指紋生成
+      function getFP() {
+        try {
+          let fp = localStorage.getItem('mgm_fp');
+          if (fp) return fp;
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          ctx.textBaseline = "top";
+          ctx.font = "14px 'Arial'";
+          ctx.fillText("Fingerprint,MGM", 2, 15);
+          const b64 = canvas.toDataURL().replace("data:image/png;base64,","");
+          let crc = 0;
+          for (let i = 0; i < b64.length; i++) {
+            crc = ((crc << 5) - crc) + b64.charCodeAt(i);
+            crc = crc & crc;
+          }
+          fp = Math.abs(crc).toString(16) + "-" + Date.now().toString(36);
+          localStorage.setItem('mgm_fp', fp);
+          return fp;
+        } catch (e) {
+          return "fp-" + Math.random().toString(36).substring(2);
+        }
+      }
+
+      let isRedirected = false;
+      function redirect(url) {
+        if (isRedirected) return;
+        isRedirected = true;
+        window.location.replace(url || defaultTarget);
+      }
+
+      // 超時 1.5 秒降級保護機制
+      const fallbackTimer = setTimeout(function() {
+        redirect(defaultTarget);
+      }, 1500);
+
+      if (code && gasUrl) {
+        const fp = getFP();
+        const apiEndpoint = gasUrl + (gasUrl.includes('?') ? '&' : '?') +
+          'action=get_target' +
+          '&code=' + encodeURIComponent(code) +
+          '&fp=' + encodeURIComponent(fp) +
+          '&referer=' + encodeURIComponent(document.referrer || "") +
+          '&userAgent=' + encodeURIComponent(navigator.userAgent || "");
+
+        fetch(apiEndpoint)
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
+            clearTimeout(fallbackTimer);
+            if (data && data.targetUrl && data.targetUrl !== '#') {
+              redirect(data.targetUrl);
+            } else {
+              redirect(defaultTarget);
+            }
+          })
+          .catch(function(err) {
+            clearTimeout(fallbackTimer);
+            redirect(defaultTarget);
+          });
+      } else {
+        clearTimeout(fallbackTimer);
+        redirect(defaultTarget);
+      }
+    })();
+  </script>
 </body>
 </html>

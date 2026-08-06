@@ -72,6 +72,63 @@ function doGet(e) {
     const action = e.parameter.action;
     const code = (e.parameter.code || '').trim().toUpperCase();
 
+    // 0. 前端 API 直連跳轉機制 (Client-side Direct API Redirection)
+    if (action === 'get_target' || action === 'redirect_api') {
+      const referer = e.parameter.referer || '';
+      const userAgent = e.parameter.userAgent || '';
+      const fp = e.parameter.fp || '';
+      const timestamp = new Date().toISOString();
+
+      let targetUrl = "https://r.botbonnie.com/H52rK"; // 預設官方 LINE OA 網址降級
+      let urlId = "";
+      
+      const linksData = sheetLinks.getDataRange().getValues();
+      const urlsData = sheetUrls.getDataRange().getValues();
+      
+      let foundUrlId = null;
+      for (let i = 1; i < linksData.length; i++) {
+        if (linksData[i][0] === code) {
+          foundUrlId = linksData[i][1];
+          break;
+        }
+      }
+      
+      if (foundUrlId) {
+        urlId = foundUrlId;
+        for (let i = 1; i < urlsData.length; i++) {
+          if (urlsData[i][0] == foundUrlId) {
+            if (urlsData[i][1] && urlsData[i][1] !== "#") {
+              targetUrl = urlsData[i][1];
+            }
+            break;
+          }
+        }
+      }
+      
+      // 記錄點擊事件
+      if (code) {
+        const uaParsed = parseUserAgent(userAgent);
+        sheetClicks.appendRow([
+          timestamp,
+          code,
+          urlId,
+          "", // IP placeholder
+          fp,
+          uaParsed.browser,
+          uaParsed.os,
+          uaParsed.device,
+          referer
+        ]);
+      }
+
+      return JSON_OUTPUT({
+        success: true,
+        code: code,
+        urlId: urlId,
+        targetUrl: targetUrl
+      });
+    }
+
     // 1. 客戶跳轉核心防護機制
     if (code && !action) {
       const scriptUrl = ScriptApp.getService().getUrl();
