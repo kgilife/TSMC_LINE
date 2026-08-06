@@ -25,7 +25,7 @@ function initSystem() {
 
   // 3. 初始化或更新 clicks 工作表
   let sheetClicks = ss.getSheetByName("clicks");
-  const newHeaders = ["Time", "Code", "URL_ID", "IP", "Fingerprint", "Browser", "OS", "Device", "Referer"];
+  const newHeaders = ["Time", "Code", "URL_ID", "IP", "Fingerprint", "Browser", "OS", "Device", "Referer", "城市／行政區"];
   
   if (!sheetClicks) {
     sheetClicks = ss.insertSheet("clicks");
@@ -64,6 +64,11 @@ function doGet(e) {
       sheetUrls = ss.getSheetByName("urls");
       sheetLinks = ss.getSheetByName("links");
       sheetClicks = ss.getSheetByName("clicks");
+    }
+
+    // 現有工作表也自動補上新欄位；只更新表頭，不回填舊資料。
+    if (sheetClicks.getRange(1, 10).getValue() !== "城市／行政區") {
+      sheetClicks.getRange(1, 10).setValue("城市／行政區");
     }
     
     const action = e.parameter.action;
@@ -106,6 +111,7 @@ function doGet(e) {
       // 記錄點擊事件
       if (code) {
         const uaParsed = parseUserAgent(userAgent);
+        const location = getIpLocationZh(ip);
         sheetClicks.appendRow([
           timestamp,
           code,
@@ -115,7 +121,8 @@ function doGet(e) {
           uaParsed.browser,
           uaParsed.os,
           uaParsed.device,
-          referer
+          referer,
+          location
         ]);
       }
 
@@ -298,6 +305,7 @@ function doGet(e) {
       const timestamp = new Date().toISOString();
 
       const uaParsed = parseUserAgent(userAgent);
+      const location = getIpLocationZh(ip);
 
       sheetClicks.appendRow([
         timestamp,
@@ -308,7 +316,8 @@ function doGet(e) {
         uaParsed.browser,
         uaParsed.os,
         uaParsed.device,
-        referer
+        referer,
+        location
       ]);
 
       return TEXT_OUTPUT("SUCCESS");
@@ -467,12 +476,13 @@ function doGet(e) {
       }
 
       // 檢查是否為新版或舊版資料表以對應正確的欄位 index
-      let fpIndex = -1, codeIndex = 1, ipIndex = -1, urlIdIndex = 2;
+      let fpIndex = -1, codeIndex = 1, ipIndex = -1, urlIdIndex = 2, locationIndex = -1;
       for (let i = 0; i < headers.length; i++) {
         if (headers[i] === 'Fingerprint') fpIndex = i;
         if (headers[i] === 'Code') codeIndex = i;
         if (headers[i] === 'IP') ipIndex = i;
         if (headers[i] === 'URL_ID') urlIdIndex = i;
+        if (headers[i] === '城市／行政區') locationIndex = i;
       }
 
       const now = new Date();
@@ -607,6 +617,7 @@ function doGet(e) {
             logObj.device = row[5];
             logObj.referer = row[6];
           }
+          logObj.city_district = locationIndex !== -1 ? row[locationIndex] : '';
           return logObj;
         });
 
@@ -718,6 +729,53 @@ function fixTargetUrl(url) {
 /**
  * 簡易 User-Agent 解析器
  */
+function getIpLocationZh(ip) {
+  const normalizedIp = String(ip || '').trim();
+  if (!normalizedIp || !/^[0-9a-f:.]+$/i.test(normalizedIp)) return '無法判讀';
+
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'ip-location-v2:' + normalizedIp;
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+
+  let location = '無法判讀';
+  try {
+    const endpoint = 'http://ip-api.com/json/' + encodeURIComponent(normalizedIp) +
+      '?lang=zh-CN&fields=status,city,district,regionName';
+    const response = UrlFetchApp.fetch(endpoint, {
+      muteHttpExceptions: true,
+      followRedirects: true
+    });
+    if (response.getResponseCode() === 200) {
+      const data = JSON.parse(response.getContentText());
+      if (data && data.status === 'success') {
+        const city = translateLocationToZhTw(data.city);
+        const district = translateLocationToZhTw(data.district);
+        const region = translateLocationToZhTw(data.regionName);
+        const parts = [city, district || region].filter(function(value, index, values) {
+          return value && values.indexOf(value) === index;
+        });
+        if (parts.length) location = parts.join('／');
+      }
+    }
+  } catch (err) {
+    // 地理服務不可用時保留「無法判讀」，避免影響原本點擊流程。
+  }
+
+  cache.put(cacheKey, location, 21600);
+  return location;
+}
+
+function translateLocationToZhTw(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  try {
+    return String(LanguageApp.translate(text, '', 'zh-TW') || text).trim();
+  } catch (err) {
+    return text;
+  }
+}
+
 function parseUserAgent(ua) {
   ua = ua || "";
   let browser = "Unknown";
