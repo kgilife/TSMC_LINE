@@ -19,7 +19,7 @@ function initSystem() {
   let sheetLinks = ss.getSheetByName("links");
   if (!sheetLinks) {
     sheetLinks = ss.insertSheet("links");
-    sheetLinks.appendRow(["User_Code", "URL_ID", "Short_URL", "Created_At"]);
+    sheetLinks.appendRow(["User_Code", "URL_ID", "Short_URL", "Created_At", "Name"]);
     sheetLinks.setFrozenRows(1);
   }
 
@@ -69,6 +69,10 @@ function doGet(e) {
     // 現有工作表也自動補上新欄位；只更新表頭，不回填舊資料。
     if (sheetClicks.getRange(1, 10).getValue() !== "城市／行政區") {
       sheetClicks.getRange(1, 10).setValue("城市／行政區");
+    }
+    // links 工作表自動補上 Name 欄位
+    if (sheetLinks.getLastRow() > 0 && sheetLinks.getRange(1, 5).getValue() !== "Name") {
+      sheetLinks.getRange(1, 5).setValue("Name");
     }
     
     const action = e.parameter.action;
@@ -380,7 +384,8 @@ function doGet(e) {
         user_code: row[0],
         url_id: row[1],
         short_url: row[2],
-        created_at: row[3]
+        created_at: row[3],
+        name: row[4] || ''
       }));
       return JSON_OUTPUT({ success: true, data: data });
     }
@@ -422,11 +427,12 @@ function doGet(e) {
         const item = items[i];
         const userCode = (item.user_code || '').trim().toUpperCase();
         const urlId = item.url_id;
+        const name = (item.name || '').trim();
         
         if (!userCode || !urlId) continue;
         
-        // 統一使用 GitHub Pages 中繼站品牌短網址 (直接掛載根域名，省略 mgm2 資料夾)
-        const finalShortUrl = "https://hub-google.github.io/?c=" + encodeURIComponent(userCode);
+        // 統一使用 GitHub Pages 中繼站品牌短網址
+        const finalShortUrl = "https://kgilife.github.io/TSMC_LINE/?c=" + encodeURIComponent(userCode);
         
         // 寫入 links 表 (先檢查是否已存在，若存在則更新，否則新增)
         const linksData = sheetLinks.getDataRange().getValues();
@@ -436,15 +442,16 @@ function doGet(e) {
             sheetLinks.getRange(r + 1, 2).setValue(urlId);
             sheetLinks.getRange(r + 1, 3).setValue(finalShortUrl);
             sheetLinks.getRange(r + 1, 4).setValue(timestamp);
+            sheetLinks.getRange(r + 1, 5).setValue(name);
             found = true;
             break;
           }
         }
         if (!found) {
-          sheetLinks.appendRow([userCode, urlId, finalShortUrl, timestamp]);
+          sheetLinks.appendRow([userCode, urlId, finalShortUrl, timestamp, name]);
         }
         
-        results.push({ user_code: userCode, url_id: urlId, short_url: finalShortUrl });
+        results.push({ user_code: userCode, url_id: urlId, short_url: finalShortUrl, name: name });
       }
       
       return JSON_OUTPUT({ success: true, data: results });
@@ -469,9 +476,12 @@ function doGet(e) {
 
       const linksData = sheetLinks.getDataRange().getValues();
       const linkMap = {};
+      const nameMap = {};
       for (let i = 1; i < linksData.length; i++) {
         if (linksData[i][0] !== "" && linksData[i][0] !== undefined) {
-          linkMap[String(linksData[i][0]).trim().toUpperCase()] = String(linksData[i][1]).trim();
+          const lCode = String(linksData[i][0]).trim().toUpperCase();
+          linkMap[lCode] = String(linksData[i][1]).trim();
+          nameMap[lCode] = String(linksData[i][4] || '').trim();
         }
       }
 
@@ -525,7 +535,8 @@ function doGet(e) {
           const codeRecords = recordsByCode[code] || [];
           const uniqueClicksForCode = calculateUniqueVisitorClusters(codeRecords, ipIndex, fpIndex);
           salespersonMap[code] = { 
-            salesperson_code: code, 
+            salesperson_code: code,
+            name: nameMap[code] || '',
             clicks: 0, 
             unique_clicks: uniqueClicksForCode, 
             last_clicked_at: clickedTime 

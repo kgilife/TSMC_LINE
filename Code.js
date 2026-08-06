@@ -19,7 +19,7 @@ function initSystem() {
   let sheetLinks = ss.getSheetByName("links");
   if (!sheetLinks) {
     sheetLinks = ss.insertSheet("links");
-    sheetLinks.appendRow(["User_Code", "URL_ID", "Short_URL", "Created_At"]);
+    sheetLinks.appendRow(["User_Code", "URL_ID", "Short_URL", "Created_At", "Name"]);
     sheetLinks.setFrozenRows(1);
   }
 
@@ -35,8 +35,6 @@ function initSystem() {
     // 檢查現有的表頭，如果發現是舊版 (沒有 URL_ID 或 Fingerprint)，則替換為新版表頭
     const currentHeaders = sheetClicks.getRange(1, 1, 1, sheetClicks.getLastColumn() || 1).getValues()[0];
     if (currentHeaders.length < newHeaders.length || !currentHeaders.includes("Fingerprint")) {
-      // 為了安全起見，若使用者已有舊資料，我們將舊的 A1 替換成新表頭
-      // 若原先是 7 欄，現在擴充為 9 欄
       sheetClicks.getRange(1, 1, 1, newHeaders.length).setValues([newHeaders]);
     }
   }
@@ -61,7 +59,6 @@ function doGet(e) {
     let sheetLinks = ss.getSheetByName("links");
     let sheetClicks = ss.getSheetByName("clicks");
     
-    // 如果工作表不存在，代表還沒初始化，自動呼叫 initSystem()
     if (!sheetUrls || !sheetLinks || !sheetClicks) {
       initSystem();
       sheetUrls = ss.getSheetByName("urls");
@@ -72,6 +69,10 @@ function doGet(e) {
     // 現有工作表也自動補上新欄位；只更新表頭，不回填舊資料。
     if (sheetClicks.getRange(1, 10).getValue() !== "城市／行政區") {
       sheetClicks.getRange(1, 10).setValue("城市／行政區");
+    }
+    // links 工作表自動補上 Name 欄位
+    if (sheetLinks.getLastRow() > 0 && sheetLinks.getRange(1, 5).getValue() !== "Name") {
+      sheetLinks.getRange(1, 5).setValue("Name");
     }
     
     const action = e.parameter.action;
@@ -133,7 +134,7 @@ function doGet(e) {
         success: true,
         code: code,
         urlId: urlId,
-        targetUrl: targetUrl
+        targetUrl: fixTargetUrl(targetUrl)
       });
     }
 
@@ -141,8 +142,7 @@ function doGet(e) {
     if (code && !action) {
       const scriptUrl = ScriptApp.getService().getUrl();
       
-      // 找出這個 code 對應的 URL_ID 和 Target URL
-      let targetUrl = "https://r.botbonnie.com/H52rK"; // 預設官方 LINE OA 網址降級
+      let targetUrl = "https://r.botbonnie.com/H52rK";
       let urlId = "";
       
       const linksData = sheetLinks.getDataRange().getValues();
@@ -181,7 +181,6 @@ function doGet(e) {
           @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         </style>
         <script>
-          // 簡易前端指紋生成 (Canvas + UserAgent)
           function generateFingerprint() {
             try {
               let stored = localStorage.getItem('mgm_fp');
@@ -218,11 +217,11 @@ function doGet(e) {
       <body>
         <div class="loader"></div>
         <h2>正在為您跳轉...</h2>
-        <a id="redirect-link" href="${targetUrl}" target="_top" style="display:none;">跳轉中...</a>
+        <a id="redirect-link" href="${fixTargetUrl(targetUrl)}" target="_top" style="display:none;">跳轉中...</a>
         
         <script>
           (function() {
-            const targetUrl = "${targetUrl}";
+            const targetUrl = "${fixTargetUrl(targetUrl)}";
             const fp = generateFingerprint();
 
             function getIP() {
@@ -332,7 +331,7 @@ function doGet(e) {
     if (action === 'getUrls') {
       const data = sheetUrls.getDataRange().getValues().slice(1).map(row => ({
         url_id: row[0],
-        target_url: row[1],
+        target_url: fixTargetUrl(row[1]),
         created_at: row[2]
       }));
       return JSON_OUTPUT({ success: true, data: data });
@@ -354,7 +353,7 @@ function doGet(e) {
       if (!urlId || !targetUrl) return JSON_OUTPUT({ success: false, error: "Missing parameters" });
       
       const timestamp = new Date().toISOString();
-      sheetUrls.appendRow([urlId, targetUrl, timestamp]);
+      sheetUrls.appendRow([urlId, fixTargetUrl(targetUrl), timestamp]);
       return JSON_OUTPUT({ success: true });
     }
 
@@ -385,7 +384,8 @@ function doGet(e) {
         user_code: row[0],
         url_id: row[1],
         short_url: row[2],
-        created_at: row[3]
+        created_at: row[3],
+        name: row[4] || ''
       }));
       return JSON_OUTPUT({ success: true, data: data });
     }
@@ -411,7 +411,6 @@ function doGet(e) {
       return JSON_OUTPUT({ success: false, error: "User Code not found" });
     }
 
-
     // 批量生成短網址
     if (action === 'generateBatch') {
       const payloadStr = e.postData ? e.postData.contents : e.parameter.payload;
@@ -428,11 +427,12 @@ function doGet(e) {
         const item = items[i];
         const userCode = (item.user_code || '').trim().toUpperCase();
         const urlId = item.url_id;
+        const name = (item.name || '').trim();
         
         if (!userCode || !urlId) continue;
         
-        // 統一使用 GitHub Pages 中繼站品牌短網址 (直接掛載根域名，省略 mgm2 資料夾)
-        const finalShortUrl = "https://hub-google.github.io/?c=" + encodeURIComponent(userCode);
+        // 統一使用 GitHub Pages 中繼站品牌短網址
+        const finalShortUrl = "https://kgilife.github.io/TSMC_LINE/?c=" + encodeURIComponent(userCode);
         
         // 寫入 links 表 (先檢查是否已存在，若存在則更新，否則新增)
         const linksData = sheetLinks.getDataRange().getValues();
@@ -442,15 +442,16 @@ function doGet(e) {
             sheetLinks.getRange(r + 1, 2).setValue(urlId);
             sheetLinks.getRange(r + 1, 3).setValue(finalShortUrl);
             sheetLinks.getRange(r + 1, 4).setValue(timestamp);
+            sheetLinks.getRange(r + 1, 5).setValue(name);
             found = true;
             break;
           }
         }
         if (!found) {
-          sheetLinks.appendRow([userCode, urlId, finalShortUrl, timestamp]);
+          sheetLinks.appendRow([userCode, urlId, finalShortUrl, timestamp, name]);
         }
         
-        results.push({ user_code: userCode, url_id: urlId, short_url: finalShortUrl });
+        results.push({ user_code: userCode, url_id: urlId, short_url: finalShortUrl, name: name });
       }
       
       return JSON_OUTPUT({ success: true, data: results });
@@ -475,9 +476,12 @@ function doGet(e) {
 
       const linksData = sheetLinks.getDataRange().getValues();
       const linkMap = {};
+      const nameMap = {};
       for (let i = 1; i < linksData.length; i++) {
         if (linksData[i][0] !== "" && linksData[i][0] !== undefined) {
-          linkMap[String(linksData[i][0]).trim().toUpperCase()] = String(linksData[i][1]).trim();
+          const lCode = String(linksData[i][0]).trim().toUpperCase();
+          linkMap[lCode] = String(linksData[i][1]).trim();
+          nameMap[lCode] = String(linksData[i][4] || '').trim();
         }
       }
 
@@ -531,7 +535,8 @@ function doGet(e) {
           const codeRecords = recordsByCode[code] || [];
           const uniqueClicksForCode = calculateUniqueVisitorClusters(codeRecords, ipIndex, fpIndex);
           salespersonMap[code] = { 
-            salesperson_code: code, 
+            salesperson_code: code,
+            name: nameMap[code] || '',
             clicks: 0, 
             unique_clicks: uniqueClicksForCode, 
             last_clicked_at: clickedTime 

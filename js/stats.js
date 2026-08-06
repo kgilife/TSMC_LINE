@@ -159,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
     leaderboardTableBody.innerHTML = '';
     
     if (data.length === 0) {
-      leaderboardTableBody.innerHTML = '<tr class="empty-row"><td colspan="4" class="text-center">暫無排名數據</td></tr>';
+      leaderboardTableBody.innerHTML = '<tr class="empty-row"><td colspan="5" class="text-center">暫無排名數據</td></tr>';
       return;
     }
 
@@ -174,6 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
       tr.innerHTML = `
         <td class="text-center">${rankBadge}</td>
         <td style="font-weight: 600;">${row.salesperson_code}</td>
+        <td>${row.name || '-'}</td>
         <td class="text-right"><span class="badge-clicks">${row.unique_clicks}</span> 次</td>
         <td style="color: var(--text-secondary); font-size: 12px;">${formatDateTime(row.last_clicked_at)}</td>
       `;
@@ -184,7 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (leaderboardSearch) {
     leaderboardSearch.addEventListener('input', (e) => {
       const keyword = e.target.value.trim().toUpperCase();
-      const filtered = allLeaderboard.filter(row => row.salesperson_code.includes(keyword));
+      const filtered = allLeaderboard.filter(row => row.salesperson_code.includes(keyword) || (row.name && row.name.toUpperCase().includes(keyword)));
       updateLeaderboardTable(filtered);
     });
   }

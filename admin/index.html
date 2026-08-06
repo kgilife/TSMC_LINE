@@ -101,12 +101,12 @@
             <i class="fa-solid fa-wand-magic-sparkles"></i>
             <h2>批量生成推廣連結</h2>
           </div>
-          <p class="card-subtitle">請從 Excel 複製兩欄 (網址編號、使用者代碼) 並貼上至下方</p>
+          <p class="card-subtitle">請從 Excel 複製三欄 (網址編號、使用者代碼、姓名) 並貼上至下方</p>
         </div>
         
         <div class="card-body">
           <div class="form-group">
-            <textarea id="batch-input" rows="8" placeholder="請貼上表格資料...&#10;1&#9;A001&#10;2&#9;B002" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical;"></textarea>
+            <textarea id="batch-input" rows="8" placeholder="請貼上表格資料...&#10;1&#9;A001&#9;王小明&#10;2&#9;B002&#9;李大華" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical;"></textarea>
           </div>
           <button id="batch-generate-btn" class="btn btn-block btn-gradient">
             <span class="btn-text">開始批量生成</span>
@@ -131,14 +131,15 @@
             <table class="app-table" id="links-table">
               <thead>
                 <tr>
-                  <th width="150">使用者代碼</th>
-                  <th width="120">網址編號</th>
+                  <th width="130">使用者代碼</th>
+                  <th width="100">網址編號</th>
                   <th>短網址</th>
+                  <th width="130">姓名</th>
                   <th width="100">操作</th>
                 </tr>
               </thead>
               <tbody>
-                <tr class="empty-row"><td colspan="4" class="text-center">讀取中...</td></tr>
+                <tr class="empty-row"><td colspan="5" class="text-center">讀取中...</td></tr>
               </tbody>
             </table>
           </div>

@@ -136,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderLinksTable(links) {
     linksTableBody.innerHTML = '';
     if (!links || links.length === 0) {
-      linksTableBody.innerHTML = '<tr class="empty-row"><td colspan="4" class="text-center">尚未生成任何推廣連結</td></tr>';
+      linksTableBody.innerHTML = '<tr class="empty-row"><td colspan="5" class="text-center">尚未生成任何推廣連結</td></tr>';
       return;
     }
     links.forEach(u => {
@@ -150,6 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <button class="btn btn-sm btn-secondary" onclick="navigator.clipboard.writeText('${u.short_url}')">複製</button>
             </div>
         </td>
+        <td>${u.name || '-'}</td>
         <td>
           <button class="btn btn-sm" style="background: var(--card-bg); border: 1px solid #ef4444; color: #ef4444;" onclick="deleteLink('${u.user_code}')">
             <i class="fa-solid fa-trash"></i> 刪除
@@ -189,13 +190,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const lines = text.split('\n');
     const items = [];
     lines.forEach(line => {
-      const parts = line.trim().split(/\s+/);
+      const parts = line.trim().split(/\t/);
       if (parts.length >= 2) {
-        items.push({ url_id: parts[0], user_code: parts[1] });
+        items.push({ url_id: parts[0], user_code: parts[1], name: parts[2] ? parts[2].trim() : '' });
       }
     });
 
-    if (items.length === 0) return alert('解析失敗，請確認格式為：網址編號(空白/Tab)使用者代碼');
+    if (items.length === 0) return alert('解析失敗，請確認格式為：網址編號(Tab)使用者代碼(Tab)姓名');
 
     batchGenerateBtn.disabled = true;
     batchGenerateBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 生成中...';
