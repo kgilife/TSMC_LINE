@@ -65,3 +65,19 @@
 ### 3.3 前端統計頁面 (`stats/index.html`)
 1. **儀表板數據更新**：將排行榜區塊置頂並滿版顯示。圖表與排行榜改以「去重複點擊數」為基準進行排序與展示。
 2. **點擊明細日誌**：原「網址編號」欄位改為直覺的「網址」超連結，點擊可另開新頁前往實際跳轉目標網址。
+
+---
+
+## 4. 全自動 CLI / REST API 部署規範 (Automated GAS Deployment Pipeline)
+
+為了達到「完全零手動、全自動化部署」的目標，系統內建了 Python REST API 部署腳本，禁止任何手動複製貼上或介面點擊：
+
+1. **部署指令**：
+   ```powershell
+   C:\Users\cyt18\anaconda3\python.exe scripts/deploy_gas.py
+   ```
+2. **部署自動化四步驟**：
+   - **Step 1 (認證)**：自動讀取本地 `C:\Users\cyt18\.clasprc.json` 憑證並向 Google OAuth2 換取最新 `access_token`。
+   - **Step 2 (同步)**：將本地 [Code.js](file:///g:/%E6%88%91%E7%9A%84%E9%9B%B2%E7%AB%AF%E7%A1%AC%E7%A2%9F/%E4%BD%9C%E5%93%81/MGM2/Code.js) 與 [appsscript.json](file:///g:/%E6%88%91%E7%9A%84%E9%9B%B2%E7%AB%AF%E7%A1%AC%E7%A2%9F/%E4%BD%9C%E5%93%81/MGM2/appsscript.json) 內容推送到 Google Apps Script 雲端。
+   - **Step 3 (版本化)**：於 GAS 建立新版號 (Immutable Version Number)。
+   - **Step 4 (發布)**：過濾出正式的 Web App 部署 ID，發送 `PUT` 請求更新 `deploymentConfig`（必須包含 `manifestFileName: "appsscript"` 欄位），實現秒級全自動發布上線。
