@@ -448,7 +448,8 @@ function doGet(e) {
           }
         }
         if (!found) {
-          sheetLinks.appendRow([userCode, urlId, finalShortUrl, timestamp, name]);
+          // 在 userCode 前面加上單引號，強迫 Google Sheet 將其視為純文字
+          sheetLinks.appendRow(["'" + userCode, urlId, finalShortUrl, timestamp, name]);
         }
         
         results.push({ user_code: userCode, url_id: urlId, short_url: finalShortUrl, name: name });
