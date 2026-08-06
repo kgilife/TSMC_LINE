@@ -2,7 +2,7 @@
 
 一個為業務員開發的 MGM (Member Get Member) 活動推廣連結生成器與實時數據統計儀表板。支援 **免伺服器雲端運行 (GitHub Pages + Google Sheets)** 與 **本地開發/私有伺服器部署 (Express + SQLite/JSON)**。
 
-*   **GitHub Pages 儀表板入口**：`https://[YOUR_GITHUB_USER].github.io/mgm2/admin/` (已隱蔽安全分流)
+*   **GitHub Pages 儀表板入口**：`https://hub-google.github.io/admin/` (已隱蔽安全分流)
 *   **Google 試算表點擊資料庫**：請參閱專案內部設定檔與 `.env` 配置
 *   **Google Apps Script 後台管理**：請於您的 Google 雲端硬碟開啟綁定試算表的 Apps Script 專案
 
@@ -33,14 +33,14 @@
 ```
 
 ### 專屬邀請連結生成原理
-- **統一 GitHub Pages 品牌短網址**：邀請網址統一使用簡潔乾淨的 GitHub Pages 域名中繼格式：`https://hub-google.github.io/mgm2/?c=10000000`。
+- **統一 GitHub Pages 品牌短網址**：邀請網址統一使用簡潔乾淨的 GitHub Pages 域名中繼格式：`https://hub-google.github.io/?c=10000000`。
 - **免依賴第三方 API**：完全不需要調用 `is.gd` 或 `TinyURL` 等外部短網址 API，格式 100% 統一且極具品牌感，永不失效或跳出長網址。
 
 ### 客戶點擊記錄與跳轉原理
-1. **點擊品牌網址**：客戶點擊 `https://hub-google.github.io/mgm2/?c=10000000` 連結，GitHub Pages 在毫秒間將 `c=10000000` 轉發至 GAS 伺服器。
+1. **點擊品牌網址**：客戶點擊 `https://hub-google.github.io/?c=10000000` 連結，GitHub Pages 在毫秒間將 `c=10000000` 轉發至 GAS 伺服器。
 2. **收集與寫入**：GAS 接收後傳回隱形載入頁面，讀取作業系統、瀏覽器、設備指紋與來源網址，向 GAS 上報寫入 Google 試算表。
 3. **秒級重定向**：背景上報完成的同時，半秒內將客戶導向 LINE OA，完成加好友。
-4. **防窺防護**：客戶手動造訪根網址 `https://hub-google.github.io/mgm2/` 時，會自動跳轉至 LINE OA，保護後端管理系統安全。
+4. **防窺防護**：客戶手動造訪根網址 `https://hub-google.github.io/` 時，會自動跳轉至 LINE OA，保護後端管理系統安全。
 
 ---
 

@@ -378,8 +378,8 @@ function doGet(e) {
         
         if (!userCode || !urlId) continue;
         
-        // 統一使用 GitHub Pages 中繼站品牌短網址 (方案二)
-        const finalShortUrl = "https://hub-google.github.io/mgm2/?c=" + encodeURIComponent(userCode);
+        // 統一使用 GitHub Pages 中繼站品牌短網址 (直接掛載根域名，省略 mgm2 資料夾)
+        const finalShortUrl = "https://hub-google.github.io/?c=" + encodeURIComponent(userCode);
         
         // 寫入 links 表 (先檢查是否已存在，若存在則更新，否則新增)
         const linksData = sheetLinks.getDataRange().getValues();
