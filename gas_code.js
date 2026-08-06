@@ -129,12 +129,12 @@ function doGet(e) {
       });
     }
 
-    // 1. 客戶跳轉核心防護機制
+    // 1. 客戶跳轉核心防護機制 (Direct HTML Fallback)
     if (code && !action) {
       const scriptUrl = ScriptApp.getService().getUrl();
       
       // 找出這個 code 對應的 URL_ID 和 Target URL
-      let targetUrl = "#"; // 預設降級跳轉
+      let targetUrl = "https://r.botbonnie.com/H52rK"; // 預設官方 LINE OA 網址降級
       let urlId = "";
       
       const linksData = sheetLinks.getDataRange().getValues();
@@ -152,7 +152,9 @@ function doGet(e) {
         urlId = foundUrlId;
         for (let i = 1; i < urlsData.length; i++) {
           if (urlsData[i][0] == foundUrlId) {
-            targetUrl = urlsData[i][1];
+            if (urlsData[i][1] && urlsData[i][1] !== "#") {
+              targetUrl = urlsData[i][1];
+            }
             break;
           }
         }

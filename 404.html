@@ -83,40 +83,45 @@
         const salespersonCode = code.trim().toUpperCase();
         console.log('偵測到業務員代碼:', salespersonCode);
 
-        // 如果設定了 GAS 網址，發送記錄請求
+        let isRedirected = false;
+        function redirect(url) {
+          if (isRedirected) return;
+          isRedirected = true;
+          window.location.replace(url || targetUrl);
+        }
+
+        const fallbackTimer = setTimeout(function() {
+          redirect(targetUrl);
+        }, 1500);
+
         if (CONFIG.GAS_WEB_APP_URL && CONFIG.GAS_WEB_APP_URL.startsWith('http')) {
-          const logUrl = `${CONFIG.GAS_WEB_APP_URL}?action=log` +
+          const apiEndpoint = `${CONFIG.GAS_WEB_APP_URL}` + (CONFIG.GAS_WEB_APP_URL.includes('?') ? '&' : '?') +
+            'action=get_target' +
             `&code=${encodeURIComponent(salespersonCode)}` +
             `&referer=${encodeURIComponent(document.referrer || '')}` +
             `&userAgent=${encodeURIComponent(navigator.userAgent || '')}`;
 
-          // 使用 fetch (no-cors) 發送請求，避免被 CORS 政策擋下
-          fetch(logUrl, { mode: 'no-cors' })
-            .then(() => {
-              // 成功後立即跳轉
-              window.location.href = targetUrl;
+          fetch(apiEndpoint)
+            .then(res => res.json())
+            .then(data => {
+              clearTimeout(fallbackTimer);
+              if (data && data.targetUrl && data.targetUrl !== '#') {
+                redirect(data.targetUrl);
+              } else {
+                redirect(targetUrl);
+              }
             })
-            .catch((err) => {
-              console.error('記錄失敗，直接跳轉:', err);
-              window.location.href = targetUrl;
+            .catch(err => {
+              clearTimeout(fallbackTimer);
+              redirect(targetUrl);
             });
-
-          // 設定防呆機制：若 600ms 內沒回應，直接強迫跳轉
-          setTimeout(() => {
-            window.location.href = targetUrl;
-          }, 600);
         } else {
-          // 無設定 GAS，直接跳轉
-          window.location.href = targetUrl;
+          clearTimeout(fallbackTimer);
+          redirect(targetUrl);
         }
       } else {
-        // 3. 沒有代碼，導回首頁 (Repo 根目錄)
-        // 若有 repo 名稱，導回 /[repo-name]/，否則導回 /
-        let homePath = '/';
-        if (pathParts.length > 1) {
-          homePath = '/' + pathParts[0] + '/';
-        }
-        window.location.href = homePath;
+        // 3. 沒有代碼，導回預設網址
+        window.location.replace(targetUrl);
       }
     })();
   </script>
