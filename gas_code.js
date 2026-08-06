@@ -214,22 +214,42 @@ function doGet(e) {
             const fp = generateFingerprint();
 
             function getIP() {
-              return fetch('https://api.db-ip.com/v2/free/self')
-                .then(function(r) { return r.json(); })
-                .then(function(d) {
-                  if (d && d[d.ipAddress ? 'ipAddress' : 'ip']) {
-                    const ipStr = d.ipAddress || d.ip;
-                    const loc = (d.countryName || d.city) ? ' (' + (d.countryName || '') + (d.city ? ', ' + d.city : '') + ')' : '';
-                    return ipStr + loc;
-                  }
-                  return '';
-                })
-                .catch(function() {
-                  return fetch('https://api.ipify.org?format=json')
-                    .then(function(r) { return r.json(); })
-                    .then(function(d) { return d.ip || ''; })
-                    .catch(function() { return ''; });
+              const sources = [
+                'https://api.ipify.org?format=json',
+                'https://api64.ipify.org?format=json',
+                'https://api.db-ip.com/v2/free/self'
+              ];
+              return new Promise(function(resolve) {
+                let pending = sources.length;
+                let settled = false;
+                const timeoutId = setTimeout(function() {
+                  if (!settled) { settled = true; resolve(''); }
+                }, 3500);
+                sources.forEach(function(url) {
+                  fetch(url, { cache: 'no-store' })
+                    .then(function(r) {
+                      if (!r.ok) throw new Error('IP service HTTP ' + r.status);
+                      return r.json();
+                    })
+                    .then(function(d) {
+                      const ip = String((d && (d.ipAddress || d.ip)) || '').trim();
+                      if (!settled && /^[0-9a-f:.]+$/i.test(ip)) {
+                        settled = true;
+                        clearTimeout(timeoutId);
+                        resolve(ip);
+                      }
+                    })
+                    .catch(function() {})
+                    .then(function() {
+                      pending--;
+                      if (!settled && pending === 0) {
+                        settled = true;
+                        clearTimeout(timeoutId);
+                        resolve('');
+                      }
+                    });
                 });
+              });
             }
 
             let redirected = false;
