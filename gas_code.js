@@ -35,8 +35,6 @@ function initSystem() {
     // 檢查現有的表頭，如果發現是舊版 (沒有 URL_ID 或 Fingerprint)，則替換為新版表頭
     const currentHeaders = sheetClicks.getRange(1, 1, 1, sheetClicks.getLastColumn() || 1).getValues()[0];
     if (currentHeaders.length < newHeaders.length || !currentHeaders.includes("Fingerprint")) {
-      // 為了安全起見，若使用者已有舊資料，我們將舊的 A1 替換成新表頭
-      // 若原先是 7 欄，現在擴充為 9 欄
       sheetClicks.getRange(1, 1, 1, newHeaders.length).setValues([newHeaders]);
     }
   }
@@ -61,7 +59,6 @@ function doGet(e) {
     let sheetLinks = ss.getSheetByName("links");
     let sheetClicks = ss.getSheetByName("clicks");
     
-    // 如果工作表不存在，代表還沒初始化，自動呼叫 initSystem()
     if (!sheetUrls || !sheetLinks || !sheetClicks) {
       initSystem();
       sheetUrls = ss.getSheetByName("urls");
@@ -77,6 +74,7 @@ function doGet(e) {
       const referer = e.parameter.referer || '';
       const userAgent = e.parameter.userAgent || '';
       const fp = e.parameter.fp || '';
+      const ip = e.parameter.ip || '';
       const timestamp = new Date().toISOString();
 
       let targetUrl = "https://r.botbonnie.com/H52rK"; // 預設官方 LINE OA 網址降級
@@ -87,16 +85,16 @@ function doGet(e) {
       
       let foundUrlId = null;
       for (let i = 1; i < linksData.length; i++) {
-        if (linksData[i][0] === code) {
+        if (String(linksData[i][0]).trim().toUpperCase() === code) {
           foundUrlId = linksData[i][1];
           break;
         }
       }
       
-      if (foundUrlId) {
-        urlId = foundUrlId;
+      if (foundUrlId !== null && foundUrlId !== undefined && foundUrlId !== "") {
+        urlId = String(foundUrlId).trim();
         for (let i = 1; i < urlsData.length; i++) {
-          if (urlsData[i][0] == foundUrlId) {
+          if (String(urlsData[i][0]).trim() === urlId) {
             if (urlsData[i][1] && urlsData[i][1] !== "#") {
               targetUrl = urlsData[i][1];
             }
@@ -112,7 +110,7 @@ function doGet(e) {
           timestamp,
           code,
           urlId,
-          "", // IP placeholder
+          ip,
           fp,
           uaParsed.browser,
           uaParsed.os,
@@ -125,7 +123,7 @@ function doGet(e) {
         success: true,
         code: code,
         urlId: urlId,
-        targetUrl: targetUrl
+        targetUrl: fixTargetUrl(targetUrl)
       });
     }
 
@@ -133,8 +131,7 @@ function doGet(e) {
     if (code && !action) {
       const scriptUrl = ScriptApp.getService().getUrl();
       
-      // 找出這個 code 對應的 URL_ID 和 Target URL
-      let targetUrl = "https://r.botbonnie.com/H52rK"; // 預設官方 LINE OA 網址降級
+      let targetUrl = "https://r.botbonnie.com/H52rK";
       let urlId = "";
       
       const linksData = sheetLinks.getDataRange().getValues();
@@ -142,16 +139,16 @@ function doGet(e) {
       
       let foundUrlId = null;
       for (let i = 1; i < linksData.length; i++) {
-        if (linksData[i][0] === code) {
+        if (String(linksData[i][0]).trim().toUpperCase() === code) {
           foundUrlId = linksData[i][1];
           break;
         }
       }
       
-      if (foundUrlId) {
-        urlId = foundUrlId;
+      if (foundUrlId !== null && foundUrlId !== undefined && foundUrlId !== "") {
+        urlId = String(foundUrlId).trim();
         for (let i = 1; i < urlsData.length; i++) {
-          if (urlsData[i][0] == foundUrlId) {
+          if (String(urlsData[i][0]).trim() === urlId) {
             if (urlsData[i][1] && urlsData[i][1] !== "#") {
               targetUrl = urlsData[i][1];
             }
@@ -173,7 +170,6 @@ function doGet(e) {
           @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         </style>
         <script>
-          // 簡易前端指紋生成 (Canvas + UserAgent)
           function generateFingerprint() {
             try {
               let stored = localStorage.getItem('mgm_fp');
@@ -210,20 +206,29 @@ function doGet(e) {
       <body>
         <div class="loader"></div>
         <h2>正在為您跳轉...</h2>
-        <a id="redirect-link" href="${targetUrl}" target="_top" style="display:none;">跳轉中...</a>
+        <a id="redirect-link" href="${fixTargetUrl(targetUrl)}" target="_top" style="display:none;">跳轉中...</a>
         
         <script>
           (function() {
-            const targetUrl = "${targetUrl}";
+            const targetUrl = "${fixTargetUrl(targetUrl)}";
             const fp = generateFingerprint();
-            
-            const logUrl = "${scriptUrl}?action=log" +
-              "&code=${encodeURIComponent(code)}" +
-              "&urlId=${encodeURIComponent(urlId)}" +
-              "&fp=" + encodeURIComponent(fp) +
-              "&referer=" + encodeURIComponent(document.referrer || "") +
-              "&userAgent=" + encodeURIComponent(navigator.userAgent || "");
-            
+
+            function getIP() {
+              return new Promise(function(resolve) {
+                let resolved = false;
+                function done(ip) { if (!resolved && ip) { resolved = true; resolve(ip); } }
+                setTimeout(function() { if (!resolved) { resolved = true; resolve(''); } }, 600);
+                const check = function(url, key) {
+                  fetch(url, { cache: 'no-store' })
+                    .then(function(r) { return r.json(); })
+                    .then(function(d) { if (d && d[key]) done(d[key]); })
+                    .catch(function() {});
+                };
+                check('https://api.db-ip.com/v2/free/self', 'ipAddress');
+                check('https://api.ipify.org?format=json', 'ip');
+              });
+            }
+
             let redirected = false;
             function doRedirect() {
               if (redirected) return;
@@ -236,12 +241,23 @@ function doGet(e) {
               }
             }
 
-            const beacon = new Image();
-            beacon.onload = doRedirect;
-            beacon.onerror = doRedirect;
-            beacon.src = logUrl;
-            
-            setTimeout(doRedirect, 400);
+            getIP().then(function(clientIp) {
+              const logUrl = "${scriptUrl}?action=log" +
+                "&code=${encodeURIComponent(code)}" +
+                "&urlId=${encodeURIComponent(urlId)}" +
+                "&fp=" + encodeURIComponent(fp) +
+                "&ip=" + encodeURIComponent(clientIp) +
+                "&referer=" + encodeURIComponent(document.referrer || "") +
+                "&userAgent=" + encodeURIComponent(navigator.userAgent || "");
+              
+              const beacon = new Image();
+              beacon.onload = doRedirect;
+              beacon.onerror = doRedirect;
+              beacon.src = logUrl;
+              setTimeout(doRedirect, 350);
+            });
+
+            setTimeout(doRedirect, 700);
           })();
         </script>
       </body>
@@ -279,7 +295,7 @@ function doGet(e) {
     if (action === 'getUrls') {
       const data = sheetUrls.getDataRange().getValues().slice(1).map(row => ({
         url_id: row[0],
-        target_url: row[1],
+        target_url: fixTargetUrl(row[1]),
         created_at: row[2]
       }));
       return JSON_OUTPUT({ success: true, data: data });
@@ -301,7 +317,7 @@ function doGet(e) {
       if (!urlId || !targetUrl) return JSON_OUTPUT({ success: false, error: "Missing parameters" });
       
       const timestamp = new Date().toISOString();
-      sheetUrls.appendRow([urlId, targetUrl, timestamp]);
+      sheetUrls.appendRow([urlId, fixTargetUrl(targetUrl), timestamp]);
       return JSON_OUTPUT({ success: true });
     }
 
@@ -358,7 +374,6 @@ function doGet(e) {
       return JSON_OUTPUT({ success: false, error: "User Code not found" });
     }
 
-
     // 批量生成短網址
     if (action === 'generateBatch') {
       const payloadStr = e.postData ? e.postData.contents : e.parameter.payload;
@@ -385,7 +400,7 @@ function doGet(e) {
         const linksData = sheetLinks.getDataRange().getValues();
         let found = false;
         for (let r = 1; r < linksData.length; r++) {
-          if (linksData[r][0] === userCode) {
+          if (String(linksData[r][0]).trim().toUpperCase() === userCode) {
             sheetLinks.getRange(r + 1, 2).setValue(urlId);
             sheetLinks.getRange(r + 1, 3).setValue(finalShortUrl);
             sheetLinks.getRange(r + 1, 4).setValue(timestamp);
@@ -409,12 +424,23 @@ function doGet(e) {
       const rows = dataRange.getValues();
       const headers = rows[0];
       const records = rows.slice(1);
+      const searchKeyword = (e.parameter.search || e.parameter.query || '').trim().toUpperCase();
 
-      // 建立 URL Map，讓統計日誌可以知道 target_url
+      // 建立 URL Map 與 Link Map，讓統計日誌可以知道 target_url（含舊資料自動補全機制）
       const urlsData = sheetUrls.getDataRange().getValues();
       const urlMap = {};
       for (let i = 1; i < urlsData.length; i++) {
-        urlMap[urlsData[i][0]] = urlsData[i][1];
+        if (urlsData[i][0] !== "" && urlsData[i][0] !== undefined) {
+          urlMap[String(urlsData[i][0]).trim()] = urlsData[i][1];
+        }
+      }
+
+      const linksData = sheetLinks.getDataRange().getValues();
+      const linkMap = {};
+      for (let i = 1; i < linksData.length; i++) {
+        if (linksData[i][0] !== "" && linksData[i][0] !== undefined) {
+          linkMap[String(linksData[i][0]).trim().toUpperCase()] = String(linksData[i][1]).trim();
+        }
       }
 
       // 檢查是否為新版或舊版資料表以對應正確的欄位 index
@@ -431,38 +457,31 @@ function doGet(e) {
 
       const uniqueSales = new Set();
       let clicksToday = 0;
-      
-      const uniqueFpMap = new Set();
-      const fpMapByCode = {};
+
+      // 按業務員將紀錄分組，方便進行獨立的跨維度去重
+      const recordsByCode = {};
 
       records.forEach(row => {
         const clickedTime = new Date(row[0]);
         const code = row[codeIndex];
-        let fp = "unknown";
-        if (fpIndex !== -1 && row[fpIndex]) {
-          fp = row[fpIndex];
-        } else if (ipIndex !== -1 && row[ipIndex]) {
-          fp = row[ipIndex];
-        }
         
         if (code) {
           uniqueSales.add(code);
-          if (!fpMapByCode[code]) fpMapByCode[code] = new Set();
-          fpMapByCode[code].add(fp);
+          if (!recordsByCode[code]) recordsByCode[code] = [];
+          recordsByCode[code].push(row);
         }
-        
-        uniqueFpMap.add(fp);
 
         if (clickedTime >= startOfToday) {
           clicksToday++;
         }
       });
 
+      // 全站跨維度雙重去重 (同 IP 算一次，同裝置算一次)
       const uniqueSalespersons = uniqueSales.size;
-      const totalUniqueClicks = uniqueFpMap.size;
+      const totalUniqueClicks = calculateUniqueVisitorClusters(records, ipIndex, fpIndex);
       const totalClicks = records.length;
 
-      // 業務員排行榜 (基於 Unique Clicks)
+      // 業務員排行榜 (基於跨維度雙重去重 Unique Clicks)
       const salespersonMap = {};
       records.forEach(row => {
         const code = row[codeIndex];
@@ -470,10 +489,12 @@ function doGet(e) {
         if (!code) return;
         
         if (!salespersonMap[code]) {
+          const codeRecords = recordsByCode[code] || [];
+          const uniqueClicksForCode = calculateUniqueVisitorClusters(codeRecords, ipIndex, fpIndex);
           salespersonMap[code] = { 
             salesperson_code: code, 
             clicks: 0, 
-            unique_clicks: fpMapByCode[code].size, 
+            unique_clicks: uniqueClicksForCode, 
             last_clicked_at: clickedTime 
           };
         }
@@ -510,17 +531,43 @@ function doGet(e) {
         clicks: trendMap[date]
       }));
 
-      // 明細日誌 (最新 100 筆)
-      const recentLogs = records
+      // 明細日誌 (若傳入關鍵字則從全量歷史紀錄中篩選並取出該關鍵字的最新 100 筆)
+      let filteredLogRecords = records;
+      if (searchKeyword) {
+        filteredLogRecords = records.filter(row => {
+          const cCode = String(row[codeIndex] || '').toUpperCase();
+          const fp = String(row[fpIndex] || '').toUpperCase();
+          const ip = String(row[ipIndex] || '').toUpperCase();
+          const os = String(row[6] || '').toUpperCase();
+          const browser = String(row[5] || '').toUpperCase();
+          const uId = String(row[urlIdIndex] || '').toUpperCase();
+          return cCode.includes(searchKeyword) || 
+                 fp.includes(searchKeyword) || 
+                 ip.includes(searchKeyword) || 
+                 os.includes(searchKeyword) || 
+                 browser.includes(searchKeyword) || 
+                 uId.includes(searchKeyword);
+        });
+      }
+
+      const recentLogs = filteredLogRecords
         .slice(-100)
         .reverse()
         .map(row => {
-          const uId = row[urlIdIndex];
+          let uId = (row[urlIdIndex] !== undefined && row[urlIdIndex] !== null) ? String(row[urlIdIndex]).trim() : '';
+          const cCode = String(row[codeIndex] || '').trim().toUpperCase();
+          
+          // 保底修復機制：若點擊紀錄未寫入 URL_ID，透過 linkMap 自動修復反查 URL_ID
+          if (!uId && cCode && linkMap[cCode]) {
+            uId = linkMap[cCode];
+          }
+
+          const rawTargetUrl = urlMap[uId] || '';
           let logObj = { 
             clicked_at: row[0], 
             salesperson_code: row[codeIndex],
             url_id: uId,
-            target_url: urlMap[uId] || ''
+            target_url: fixTargetUrl(rawTargetUrl)
           };
           if (fpIndex !== -1) {
             logObj.ip_address = row[3];
@@ -563,6 +610,85 @@ function doGet(e) {
   } catch (err) {
     return JSON_OUTPUT({ success: false, error: err.toString() });
   }
+}
+
+/**
+ * 併查集 (Union-Find / Disjoint Set Union) 雙重去重演算法
+ * 滿足：「同 IP 點多次算 1 次」且「同裝置 (Fingerprint / Device Hash) 點多次算 1 次」
+ */
+function calculateUniqueVisitorClusters(recordsList, ipIdx, fpIdx) {
+  const parent = {};
+
+  function find(i) {
+    if (parent[i] === undefined) {
+      parent[i] = i;
+      return i;
+    }
+    if (parent[i] === i) return i;
+    parent[i] = find(parent[i]);
+    return parent[i];
+  }
+
+  function union(i, j) {
+    const rootI = find(i);
+    const rootJ = find(j);
+    if (rootI !== rootJ) {
+      parent[rootI] = rootJ;
+    }
+  }
+
+  const recordClusters = [];
+
+  recordsList.forEach((row, idx) => {
+    const rawIp = (ipIdx !== -1 && row[ipIdx] !== undefined && row[ipIdx] !== null) ? String(row[ipIdx]).trim() : '';
+    const rawFp = (fpIdx !== -1 && row[fpIdx] !== undefined && row[fpIdx] !== null) ? String(row[fpIdx]).trim() : '';
+    
+    // 提煉裝置 Canvas 特徵碼 (例如 "4edca6f2-msgyj..." 之 "4edca6f2")
+    const devHash = rawFp ? rawFp.split('-')[0] : '';
+
+    const keys = [];
+    if (rawIp) keys.push("IP:" + rawIp);
+    if (rawFp) keys.push("FP:" + rawFp);
+    if (devHash) keys.push("DEV:" + devHash);
+
+    if (keys.length === 0) {
+      const anonKey = "ANON:" + idx;
+      find(anonKey);
+      recordClusters.push(anonKey);
+    } else {
+      const firstKey = keys[0];
+      find(firstKey);
+      for (let k = 1; k < keys.length; k++) {
+        union(firstKey, keys[k]);
+      }
+      recordClusters.push(firstKey);
+    }
+  });
+
+  const uniqueRoots = new Set();
+  recordClusters.forEach(key => {
+    uniqueRoots.add(find(key));
+  });
+
+  return uniqueRoots.size;
+}
+
+/**
+ * URL 自動修復工具 (防止拼寫錯誤，如 ttps:// 自動補齊為 https://)
+ */
+function fixTargetUrl(url) {
+  if (!url) return '';
+  url = String(url).trim();
+  if (/^ttps:\/\//i.test(url)) {
+    return url.replace(/^ttps:\/\//i, 'https://');
+  }
+  if (/^ttp:\/\//i.test(url)) {
+    return url.replace(/^ttp:\/\//i, 'http://');
+  }
+  if (!/^https?:\/\//i.test(url) && url !== '#') {
+    return 'https://' + url;
+  }
+  return url;
 }
 
 /**

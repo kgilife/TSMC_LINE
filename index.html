@@ -85,29 +85,52 @@
         redirect(defaultTarget);
       }, 1500);
 
+      // 參考 JX3_Guatian 穩定的 IP + 地理位置抓取機制
+      function getIP() {
+        return fetch('https://api.db-ip.com/v2/free/self')
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            if (d && d.ipAddress) {
+              const loc = (d.countryName || d.city) ? ' (' + (d.countryName || '') + (d.city ? ', ' + d.city : '') + ')' : '';
+              return d.ipAddress + loc;
+            }
+            return '';
+          })
+          .catch(function() {
+            return fetch('https://api.ipify.org?format=json')
+              .then(function(r) { return r.json(); })
+              .then(function(d) { return d.ip || ''; })
+              .catch(function() { return ''; });
+          });
+      }
+
       if (code && gasUrl) {
         const fp = getFP();
-        const apiEndpoint = gasUrl + (gasUrl.includes('?') ? '&' : '?') +
-          'action=get_target' +
-          '&code=' + encodeURIComponent(code) +
-          '&fp=' + encodeURIComponent(fp) +
-          '&referer=' + encodeURIComponent(document.referrer || "") +
-          '&userAgent=' + encodeURIComponent(navigator.userAgent || "");
 
-        fetch(apiEndpoint)
-          .then(function(res) { return res.json(); })
-          .then(function(data) {
-            clearTimeout(fallbackTimer);
-            if (data && data.targetUrl && data.targetUrl !== '#') {
-              redirect(data.targetUrl);
-            } else {
+        getIP().then(function(clientIp) {
+          const apiEndpoint = gasUrl + (gasUrl.includes('?') ? '&' : '?') +
+            'action=get_target' +
+            '&code=' + encodeURIComponent(code) +
+            '&fp=' + encodeURIComponent(fp) +
+            '&ip=' + encodeURIComponent(clientIp) +
+            '&referer=' + encodeURIComponent(document.referrer || "") +
+            '&userAgent=' + encodeURIComponent(navigator.userAgent || "");
+
+          fetch(apiEndpoint)
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+              clearTimeout(fallbackTimer);
+              if (data && data.targetUrl && data.targetUrl !== '#') {
+                redirect(data.targetUrl);
+              } else {
+                redirect(defaultTarget);
+              }
+            })
+            .catch(function(err) {
+              clearTimeout(fallbackTimer);
               redirect(defaultTarget);
-            }
-          })
-          .catch(function(err) {
-            clearTimeout(fallbackTimer);
-            redirect(defaultTarget);
-          });
+            });
+        });
       } else {
         clearTimeout(fallbackTimer);
         redirect(defaultTarget);

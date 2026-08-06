@@ -228,16 +228,41 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  if(logsSearch) {
+  let logsSearchTimeout = null;
+  if (logsSearch) {
     logsSearch.addEventListener('input', (e) => {
-      const keyword = e.target.value.trim().toUpperCase();
-      const filtered = allLogs.filter(row => {
-        return (row.salesperson_code||'').includes(keyword) || 
-               (row.os||'').toUpperCase().includes(keyword) || 
-               (row.browser||'').toUpperCase().includes(keyword) ||
-               (row.url_id||'').includes(keyword);
+      const keyword = e.target.value.trim();
+      
+      // 1. 本地快速過濾 (選用)
+      const localFiltered = allLogs.filter(row => {
+        const kw = keyword.toUpperCase();
+        return (row.salesperson_code||'').toUpperCase().includes(kw) || 
+               (row.os||'').toUpperCase().includes(kw) || 
+               (row.browser||'').toUpperCase().includes(kw) ||
+               (row.url_id||'').toUpperCase().includes(kw) ||
+               (row.fingerprint||'').toUpperCase().includes(kw) ||
+               (row.ip_address||'').toUpperCase().includes(kw);
       });
-      updateLogsTable(filtered);
+      updateLogsTable(localFiltered);
+
+      // 2. 後端全資料庫檢索 (Debounce 300ms)：從歷來所有點擊紀錄中撈出符合該代號的最新 100 筆！
+      clearTimeout(logsSearchTimeout);
+      logsSearchTimeout = setTimeout(async () => {
+        if (!keyword) {
+          updateLogsTable(allLogs);
+          return;
+        }
+
+        try {
+          const res = await fetch(`${gasUrl}?action=stats&search=${encodeURIComponent(keyword)}`);
+          const resData = await res.json();
+          if (resData && resData.success && resData.data.recentLogs) {
+            updateLogsTable(resData.data.recentLogs);
+          }
+        } catch (err) {
+          console.error('全量歷史搜尋失敗:', err);
+        }
+      }, 300);
     });
   }
 
