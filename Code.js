@@ -623,7 +623,7 @@ function doGet(e) {
 
 /**
  * 併查集 (Union-Find / Disjoint Set Union) 雙重去重演算法
- * 滿足：「同 IP 點多次算 1 次」且「同裝置 (Fingerprint / Device Hash) 點多次算 1 次」
+ * 嚴格防止空 IP 與通用畫布特徵碼把所有人合併為 1 人！
  */
 function calculateUniqueVisitorClusters(recordsList, ipIdx, fpIdx) {
   const parent = {};
@@ -646,36 +646,37 @@ function calculateUniqueVisitorClusters(recordsList, ipIdx, fpIdx) {
     }
   }
 
-  const recordClusters = [];
+  const recordKeys = [];
 
   recordsList.forEach((row, idx) => {
     const rawIp = (ipIdx !== -1 && row[ipIdx] !== undefined && row[ipIdx] !== null) ? String(row[ipIdx]).trim() : '';
     const rawFp = (fpIdx !== -1 && row[fpIdx] !== undefined && row[fpIdx] !== null) ? String(row[fpIdx]).trim() : '';
-    
-    // 提煉裝置 Canvas 特徵碼 (例如 "4edca6f2-msgyj..." 之 "4edca6f2")
-    const devHash = rawFp ? rawFp.split('-')[0] : '';
+
+    // 嚴格過濾：空白 IP 或 unknown/null 不算有效 IP 共享鍵，避免所有空 IP 被合併為 1 人
+    const isValidIp = rawIp !== '' && rawIp !== 'unknown' && rawIp !== 'null' && rawIp !== 'undefined' && rawIp !== '127.0.0.1';
+    const isValidFp = rawFp !== '' && rawFp !== 'unknown' && rawFp !== 'null' && rawFp !== 'undefined';
 
     const keys = [];
-    if (rawIp) keys.push("IP:" + rawIp);
-    if (rawFp) keys.push("FP:" + rawFp);
-    if (devHash) keys.push("DEV:" + devHash);
+    if (isValidIp) keys.push("IP:" + rawIp);
+    if (isValidFp) keys.push("FP:" + rawFp); // 使用全量完整指紋 Token，絕不拆出跨機萬能 devHash
 
     if (keys.length === 0) {
+      // 若該筆點擊紀錄既無 IP 也無指紋，作為獨立匿名點擊，絕不合併
       const anonKey = "ANON:" + idx;
       find(anonKey);
-      recordClusters.push(anonKey);
+      recordKeys.push(anonKey);
     } else {
       const firstKey = keys[0];
       find(firstKey);
       for (let k = 1; k < keys.length; k++) {
         union(firstKey, keys[k]);
       }
-      recordClusters.push(firstKey);
+      recordKeys.push(firstKey);
     }
   });
 
   const uniqueRoots = new Set();
-  recordClusters.forEach(key => {
+  recordKeys.forEach(key => {
     uniqueRoots.add(find(key));
   });
 
