@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-TW" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MGM 統計數據與儀表板</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
+  <script>
+    document.write('<link rel="stylesheet" href="../css/style.css?v=' + new Date().getTime() + '">');
+  </script>
+</head>
+<body>
+
+  <div class="glow-bg">
+    <div class="glow-sphere sphere-1"></div>
+    <div class="glow-sphere sphere-2"></div>
+  </div>
+
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand">
+        <div class="brand-logo"><i class="fa-solid fa-chart-simple"></i></div>
+        <div class="brand-text">
+          <h1>MGM 統計看版</h1>
+          <span>業務推廣成效分析</span>
+        </div>
+      </div>
+      
+      <nav class="nav-menu">
+        <a href="#dashboard-section" class="nav-link active"><i class="fa-solid fa-chart-simple"></i> 數據看板</a>
+        <a href="#leaderboard-section" class="nav-link"><i class="fa-solid fa-trophy"></i> 排行榜</a>
+      </nav>
+
+      <div class="header-actions">
+        <button id="theme-toggle-btn" class="action-btn" title="切換深淺色模式">
+          <i class="fa-solid fa-moon"></i>
+        </button>
+        <button id="refresh-data-btn" class="action-btn btn-primary" title="重新整理數據">
+          <i class="fa-solid fa-rotate"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-content">
+    
+    <div id="setup-banner" class="card glass-card setup-banner hidden" style="border-color: #eab308; background: rgba(234,179,8,0.05); padding: 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <div style="font-size: 28px; color: #eab308;"><i class="fa-solid fa-circle-exclamation"></i></div>
+        <div>
+          <h4 style="font-size: 15px; font-weight: 600; margin-bottom: 4px;">⚠️ 尚未設定 Google 試算表 API</h4>
+          <p style="font-size: 13px; color: var(--text-secondary);">請先設定 config.js。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Metrics Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-bottom: 24px;">
+      <div class="card glass-card metric-card count-card">
+        <div class="metric-icon c1"><i class="fa-solid fa-fingerprint"></i></div>
+        <div class="metric-info">
+          <span class="metric-label">總去重複點擊</span>
+          <h3 id="stat-unique-clicks" class="metric-value">0</h3>
+          <span class="metric-desc">基於裝置指紋去重複統計</span>
+        </div>
+      </div>
+      <div class="card glass-card metric-card count-card">
+        <div class="metric-icon c2"><i class="fa-solid fa-mouse-pointer"></i></div>
+        <div class="metric-info">
+          <span class="metric-label">總點擊次數</span>
+          <h3 id="stat-total-clicks" class="metric-value">0</h3>
+          <span class="metric-desc">所有原始點擊次數 (包含重複)</span>
+        </div>
+      </div>
+      <div class="card glass-card metric-card count-card">
+        <div class="metric-icon c3"><i class="fa-solid fa-users-rectangle"></i></div>
+        <div class="metric-info">
+          <span class="metric-label">累計推廣業務員數</span>
+          <h3 id="stat-active-sales" class="metric-value">0</h3>
+          <span class="metric-desc">至少獲得 1 次點擊的業務員</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION: Leaderboard -->
+    <section id="leaderboard-section" class="content-section">
+      <div class="card glass-card leaderboard-card">
+        <div class="card-header">
+          <div class="card-title">
+            <i class="fa-solid fa-trophy"></i>
+            <h2>業務推廣排行榜 (基於去重複點擊)</h2>
+          </div>
+          <div class="card-actions-header">
+            <input type="text" id="leaderboard-search" class="table-search" placeholder="搜尋代號...">
+          </div>
+        </div>
+        <div class="card-body no-padding scrollable-table">
+          <table class="app-table" id="leaderboard-table">
+            <thead>
+              <tr>
+                <th width="80">名次</th>
+                <th>業務員代號</th>
+                <th width="120" class="text-right">去重複點擊</th>
+                <th width="180">最後點擊時間</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="empty-row"><td colspan="4" class="text-center">暫無數據</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: Analytics Chart -->
+    <section id="dashboard-section" class="content-section">
+      <div class="card glass-card chart-card">
+        <div class="card-header">
+          <div class="card-title">
+            <i class="fa-solid fa-chart-line"></i>
+            <h2>點擊趨勢分析</h2>
+          </div>
+          <p class="card-subtitle">顯示最近 7 天的每日點擊走勢圖</p>
+        </div>
+        <div class="card-body">
+          <div class="chart-wrapper">
+            <canvas id="trendChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: Recent Click Logs -->
+    <section id="logs-section" class="content-section">
+      <div class="card glass-card logs-card">
+        <div class="card-header">
+          <div class="card-title">
+            <i class="fa-solid fa-list-ul"></i>
+            <h2>點擊明細日誌 (最新100筆)</h2>
+          </div>
+          <div class="card-actions-header">
+            <input type="text" id="logs-search" class="table-search" placeholder="搜尋代號/系統/瀏覽器...">
+          </div>
+        </div>
+        <div class="card-body no-padding scrollable-table">
+          <table class="app-table" id="logs-table">
+            <thead>
+              <tr>
+                <th width="180">時間</th>
+                <th width="100">業務員</th>
+                <th width="100">網址</th>
+                <th width="100">數位指紋</th>
+                <th width="100">作業系統</th>
+                <th width="120">瀏覽器</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="empty-row"><td colspan="6" class="text-center">暫無數據</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    document.write('<script src="../js/config.js?v=' + new Date().getTime() + '"><\/script>');
+    document.write('<script src="../js/stats.js?v=' + new Date().getTime() + '"><\/script>');
+  </script>
+</body>
+</html>

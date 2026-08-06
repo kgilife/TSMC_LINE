@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <!-- Cache Control to prevent browser cache issues -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>正在跳轉...</title>
+  <script>
+    document.write('<script src="js/config.js?v=' + new Date().getTime() + '"><\/script>');
+  </script>
+  <script>
+    // 品牌短網址中繼跳轉邏輯 (GitHub Pages Redirect)
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('c') || urlParams.get('code');
+
+    if (code && typeof CONFIG !== 'undefined' && CONFIG.GAS_WEB_APP_URL) {
+      // 當帶有推廣代碼時 (?c=10000000)，毫秒級轉發至 GAS 進行點擊記錄與跳轉
+      const gasTarget = CONFIG.GAS_WEB_APP_URL + (CONFIG.GAS_WEB_APP_URL.includes('?') ? '&' : '?') + 'code=' + encodeURIComponent(code);
+      window.location.replace(gasTarget);
+    } else {
+      // 隱蔽安全機制：無代碼造訪者跳轉至預設 LINE OA
+      const targetUrl = (typeof CONFIG !== 'undefined' && CONFIG.TARGET_URL) ? CONFIG.TARGET_URL : '#';
+      window.location.replace(targetUrl);
+    }
+  </script>
+</head>
+<body>
+  <div style="font-family: sans-serif; text-align: center; margin-top: 100px;">
+    <p>正在為您載入推廣頁面...</p>
+  </div>
+</body>
+</html>
